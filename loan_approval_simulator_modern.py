@@ -13,6 +13,7 @@ class LoanApprovalSimulator(ttk.Window):
         self.resizable(False, False)
 
         self.entries = {}
+        self.error_labels = {}
         self._build_ui()
 
     # ---------------------------------------------------------
@@ -33,14 +34,23 @@ class LoanApprovalSimulator(ttk.Window):
             ("Loan Amount Requested (SGD)", "loan")
         ]
 
+        # Each field: Label | Entry | Inline Error BELOW entry
         for i, (label, key) in enumerate(fields):
-            ttk.Label(form, text=label, font=("Segoe UI", 11)).grid(row=i, column=0, sticky="w", pady=8, padx=5)
+            row = i * 2  # double the row index to leave space for error below
+            ttk.Label(form, text=label, font=("Segoe UI", 11)).grid(row=row, column=0, sticky="w", pady=(5, 0), padx=5)
+
             entry = ttk.Entry(form, width=25, bootstyle=INFO)
-            entry.grid(row=i, column=1, pady=8)
+            entry.grid(row=row, column=1, sticky="w", pady=(5, 0))
             self.entries[key] = entry
 
+            # Inline error label BELOW entry
+            error_label = ttk.Label(form, text="", font=("Segoe UI", 9, "italic"), foreground="red")
+            error_label.grid(row=row + 1, column=1, sticky="w", padx=5, pady=(0, 5))
+            self.error_labels[key] = error_label
+
+        # Info button beside Credit Score field
         ttk.Button(form, text="❓", width=3, bootstyle=(INFO, OUTLINE),
-                   command=self.show_credit_info).grid(row=1, column=2, padx=8)
+                   command=self.show_credit_info).grid(row=1, column=2, padx=8, sticky="w")
 
         # Action Buttons
         btn_frame = ttk.Frame(self)
@@ -56,6 +66,9 @@ class LoanApprovalSimulator(ttk.Window):
 
         self.progress = ttk.Progressbar(self, orient="horizontal", length=400, mode="determinate", bootstyle=SUCCESS)
         self.progress.pack(pady=(0, 10))
+
+        self.result_label = ttk.Label(self, text="", font=("Segoe UI", 14, "bold"))
+        self.result_label.pack(pady=(5, 10))
 
         self.chart_frame = ttk.Frame(self)
         self.chart_frame.pack(fill="both", expand=True, padx=20, pady=10)
@@ -78,37 +91,86 @@ class LoanApprovalSimulator(ttk.Window):
         )
 
     # ---------------------------------------------------------
+    # INLINE FIELD ERROR
+    # ---------------------------------------------------------
+    def show_field_error(self, field, message):
+        """Show inline error below specific field, auto-clears after 4s."""
+        self.error_labels[field].config(text=message)
+        self.after(4000, lambda: self.error_labels[field].config(text=""))
+
+    def clear_all_errors(self):
+        for lbl in self.error_labels.values():
+            lbl.config(text="")
+
+    # ---------------------------------------------------------
     # MAIN LOGIC
     # ---------------------------------------------------------
     def run_simulation(self):
-        # Validate Inputs
+        """Validate inputs and simulate loan approval."""
+        self.clear_all_errors()
+        valid = True
+
+        # --- Validation per field ---
         try:
             income = float(self.entries["income"].get())
-            credit = float(self.entries["credit"].get())
-            debt = float(self.entries["debt"].get())
-            loan = float(self.entries["loan"].get())
+            if income <= 0:
+                self.show_field_error("income", "Must be > 0")
+                valid = False
         except ValueError:
-            messagebox.showerror("Invalid Input", "Please enter numeric values for all fields.")
-            return
+            self.show_field_error("income", "Enter number")
+            valid = False
 
-        if any(v <= 0 for v in [income, loan]) or not (300 <= credit <= 850):
-            messagebox.showerror("Invalid Values",
-                                 "Ensure income and loan > 0 and credit score between 300 and 850.")
-            return
+        try:
+            credit = float(self.entries["credit"].get())
+            if not (300 <= credit <= 850):
+                self.show_field_error("credit", "300–850 only")
+                valid = False
+        except ValueError:
+            self.show_field_error("credit", "Enter number")
+            valid = False
 
-        # Compute normalized factors
+        try:
+            debt = float(self.entries["debt"].get())
+        except ValueError:
+            self.show_field_error("debt", "Enter number")
+            valid = False
+
+        try:
+            loan = float(self.entries["loan"].get())
+            if loan <= 0:
+                self.show_field_error("loan", "Must be > 0")
+                valid = False
+        except ValueError:
+            self.show_field_error("loan", "Enter number")
+            valid = False
+
+        if not valid:
+            return  # Stop if any validation fails
+
+        # --- Compute normalized factors ---
         income_factor = min(income / (loan * 0.5), 1)
         credit_factor = (credit - 300) / (850 - 300)
         debt_factor = max(1 - (debt / (income * 0.4)), 0)
 
-        # Weighted model
         approval_prob = 0.4 * income_factor + 0.4 * credit_factor + 0.2 * debt_factor
         approval_pct = round(approval_prob * 100, 2)
 
-        # Update UI
+        # --- Update UI ---
         self.progress["value"] = approval_pct
         self.progress_label.config(text=f"Predicted Loan Approval Probability: {approval_pct}%")
 
+        # Result summary
+        if approval_pct >= 70:
+            msg = f"✅ Approved — Excellent financial standing ({approval_pct}%)"
+            color = "green"
+        elif 50 <= approval_pct < 70:
+            msg = f"⚖️ Borderline — Consider reducing debt or applying for a smaller loan ({approval_pct}%)"
+            color = "#f1c40f"
+        else:
+            msg = f"❌ Not Approved — Improve credit or income ({approval_pct}%)"
+            color = "red"
+
+        self.result_label.config(text=msg, foreground=color)
         self.display_chart(income_factor, credit_factor, debt_factor)
 
     # ---------------------------------------------------------
@@ -142,6 +204,8 @@ class LoanApprovalSimulator(ttk.Window):
             entry.delete(0, tk.END)
         self.progress["value"] = 0
         self.progress_label.config(text="")
+        self.result_label.config(text="")
+        self.clear_all_errors()
         for widget in self.chart_frame.winfo_children():
             widget.destroy()
 
@@ -151,4 +215,4 @@ class LoanApprovalSimulator(ttk.Window):
 # ---------------------------------------------------------
 if __name__ == "__main__":
     app = LoanApprovalSimulator()
-    app.mainloop()  # Start event loop (keeps window open)
+    app.mainloop()
