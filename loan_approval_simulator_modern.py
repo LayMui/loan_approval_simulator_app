@@ -49,8 +49,19 @@ class LoanApprovalSimulator(ttk.Window):
             self.error_labels[key] = error_label
 
         # Info button beside Credit Score field
-        ttk.Button(form, text="❓", width=3, bootstyle=(INFO, OUTLINE),
-                   command=self.show_credit_info).grid(row=1, column=2, padx=8, sticky="w")
+        # ttk.Button(form, text="❓", width=3, bootstyle=(INFO, OUTLINE),
+        #            command=self.show_credit_info).grid(row=1, column=2, padx=8, sticky="w")
+
+        # Info button beside Credit Score field (aligned with its entry on row=2)
+        info_btn = ttk.Button(
+            form,
+            text="❓",
+            width=3,
+            bootstyle=(INFO, OUTLINE),
+            command=self.show_credit_info
+        )
+        info_btn.grid(row=2, column=2, padx=(8, 0), pady=(5, 0), sticky="w")
+
 
         # Action Buttons
         btn_frame = ttk.Frame(self)
@@ -73,7 +84,7 @@ class LoanApprovalSimulator(ttk.Window):
         self.chart_frame = ttk.Frame(self)
         self.chart_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
-        ttk.Label(self, text="Developed by Team of 5 — Demonstrating Algorithm Design, UI Creativity, and Robustness",
+        ttk.Label(self, text="Developed by Team 7 MH6803 Python Project November 2025",
                   font=("Segoe UI", 9, "italic"), foreground="#9ab").pack(pady=5)
 
     # ---------------------------------------------------------
